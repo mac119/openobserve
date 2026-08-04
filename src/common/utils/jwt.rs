@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
 use {
     jsonwebtoken::{
         Algorithm, DecodingKey, TokenData, Validation, decode, decode_header,
@@ -23,10 +22,8 @@ use {
     std::collections::HashMap,
 };
 
-#[cfg(feature = "enterprise")]
 use crate::common::meta::user::TokenValidationResponse;
 
-#[cfg(feature = "enterprise")]
 type VerifyTokenResult = Result<
     (
         TokenValidationResponse,
@@ -40,7 +37,6 @@ type VerifyTokenResult = Result<
 /// There's no built-in conversion from `KeyAlgorithm`
 /// to `Algorithm` so we need to do it manually, while
 /// avoiding string conversions.
-#[cfg(feature = "enterprise")]
 #[inline]
 fn key_algorithm_to_algorithm(key_algo: &KeyAlgorithm) -> Option<Algorithm> {
     match key_algo {
@@ -61,8 +57,7 @@ fn key_algorithm_to_algorithm(key_algo: &KeyAlgorithm) -> Option<Algorithm> {
 }
 
 #[allow(clippy::type_complexity)]
-#[cfg(feature = "enterprise")]
-pub(crate) fn verify_decode_token(
+pub fn verify_decode_token(
     token: &str,
     jwks: &str,
     aud: &str,
@@ -153,7 +148,6 @@ pub(crate) fn verify_decode_token(
     ))
 }
 
-#[cfg(feature = "enterprise")]
 #[cfg(test)]
 mod tests {
     use super::*;

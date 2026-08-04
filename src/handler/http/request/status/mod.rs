@@ -337,7 +337,9 @@ pub async fn zo_config() -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     let block_features = block_feature_for_report_failure().await;
 
-    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    // Open-source builds expose SSO via the standard-OIDC implementation
+    // (ZO_OIDC_ENABLED); enterprise builds use the Dex-based flow.
+    let sso_enabled = enterprise_value!(cfg.auth.oidc_enabled, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
     let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);

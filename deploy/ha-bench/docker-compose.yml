@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:latest
+    command: ["-js", "-sd", "/data"]
+    ports:
+      - "4222:4222"
+    volumes:
+      - nats_data:/data
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: openobserve
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/openobserve --ignore-existing;
+      exit 0;
+      "
+
+  # Router - entry point for HTTP requests
+  router:
+    image: openobserve-ha:bench
+    build:
+      context: ../..
+      dockerfile: deploy/ha-bench/Dockerfile
+    environment: &common_env
+      ZO_LOCAL_MODE: "false"
+      ZO_NODE_ROLE: "router"
+      ZO_CLUSTER_NAME: "bench_cluster"
+      ZO_CLUSTER_COORDINATOR: "nats"
+      ZO_META_STORE: "postgres"
+      ZO_META_POSTGRES_DSN: "postgres://postgres:postgres123@postgres:5432/openobserve"
+      ZO_NATS_ADDR: "nats:4222"
+      ZO_S3_SERVER_URL: "http://minio:9000"
+      ZO_S3_ACCESS_KEY: "minioadmin"
+      ZO_S3_SECRET_KEY: "minioadmin"
+      ZO_S3_BUCKET_NAME: "openobserve"
+      ZO_S3_PROVIDER: "minio"
+      ZO_S3_REGION_NAME: "us-east-1"
+      ZO_HTTP_PORT: "5080"
+      ZO_GRPC_PORT: "5081"
+      ZO_INTERNAL_GRPC_TOKEN: "bench-token-123"
+      ZO_ROOT_USER_EMAIL: "admin@bench.com"
+      ZO_ROOT_USER_PASSWORD: "Bench123!"
+      ZO_ENABLE_INVERTED_INDEX: "true"
+      ZO_NATS_REPLICAS: "1"
+      ZO_TELEMETRY: "false"
+      RUST_LOG: "info"
+    ports:
+      - "5090:5080"
+    depends_on:
+      - nats
+      - postgres
+      - minio-setup
+
+  # Ingester - handles data ingestion
+  ingester:
+    image: openobserve-ha:bench
+    environment:
+      <<: *common_env
+      ZO_NODE_ROLE: "ingester"
+    depends_on:
+      - nats
+      - postgres
+      - minio-setup
+
+  # Querier - handles search queries
+  querier:
+    image: openobserve-ha:bench
+    environment:
+      <<: *common_env
+      ZO_NODE_ROLE: "querier"
+    depends_on:
+      - nats
+      - postgres
+      - minio-setup
+
+  # Compactor - handles file merging and index building
+  compactor:
+    image: openobserve-ha:bench
+    environment:
+      <<: *common_env
+      ZO_NODE_ROLE: "compactor"
+    depends_on:
+      - nats
+      - postgres
+      - minio-setup
+
+volumes:
+  nats_data:
+  pg_data:
+  minio_data:

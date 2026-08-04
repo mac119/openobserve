@@ -188,6 +188,7 @@ size="xs" class="warning" />{{
       <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
       <!-- Open Source: primary CTA to drive upgrades -->
       <OButton
+        v-if="config.isEnterprise === 'true' || config.isCloud === 'true'"
         :variant="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'outline-primary' : 'primary'"
         size="xs"
         data-test="upgrade-to-enterprise-btn"
@@ -233,17 +234,6 @@ size="xs" class="warning" />{{
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
-
-      <!-- SLACK COMMUNITY LINK -->
-      <OButton
-        variant="ghost"
-        size="icon-toolbar"
-        data-test="menu-link-slack-item"
-        @click="openSlack"
-      >
-        <component :is="slackIcon" class="size-5 shrink-0" />
-        <OTooltip side="top" align="center" :content="t('menu.slack')" />
-      </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <ODropdown side="bottom" align="end">

@@ -474,6 +474,13 @@ where
             let access_token = auth_tokens.access_token;
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
+            } else if let Some(session_key) = access_token.strip_prefix("session ") {
+                // Open-source OIDC SSO stores a Basic credential server-side and
+                // hands the browser only `session <id>`; resolve it back here.
+                match crate::service::db::session::get(session_key).await {
+                    Ok(token) => token,
+                    Err(_) => format!("Bearer {access_token}"),
+                }
             } else {
                 format!("Bearer {access_token}")
             }

@@ -227,7 +227,11 @@ export default defineComponent({
     });
 
     const showSSO = computed(() => {
-      return store.state.zoConfig.sso_enabled && config.isEnterprise === "true";
+      // Show the SSO button whenever the backend reports SSO is enabled. In the
+      // open-source build this is driven by ZO_OIDC_ENABLED (standard OIDC);
+      // enterprise builds additionally run the Dex flow. We intentionally do not
+      // gate on isEnterprise so the OSS OIDC login is available.
+      return store.state.zoConfig.sso_enabled;
     });
 
     const showInternalLogin = computed(() => {

@@ -735,6 +735,31 @@ pub struct Auth {
     /// Used for existing sessions when migrating to add expires_at column
     #[env_config(name = "ZO_SESSION_DEFAULT_EXPIRY_HOURS", default = 24)]
     pub session_default_expiry_hours: i64,
+    // ---------------------------------------------------------------------
+    // Open-source OIDC / SSO (standard OpenID Connect). When enabled, the
+    // login page shows a "Login with SSO" button that starts an OIDC
+    // authorization-code + PKCE flow against the configured provider. First
+    // login auto-creates the user in `oidc_default_org` with `oidc_default_role`.
+    // ---------------------------------------------------------------------
+    #[env_config(name = "ZO_OIDC_ENABLED", default = false)]
+    pub oidc_enabled: bool,
+    /// OIDC issuer base URL, e.g. https://accounts.google.com or your Keycloak realm URL.
+    /// The provider's discovery document is fetched from `{issuer}/.well-known/openid-configuration`.
+    #[env_config(name = "ZO_OIDC_ISSUER_URL", default = "")]
+    pub oidc_issuer_url: String,
+    #[env_config(name = "ZO_OIDC_CLIENT_ID", default = "")]
+    pub oidc_client_id: String,
+    #[env_config(name = "ZO_OIDC_CLIENT_SECRET", default = "")]
+    pub oidc_client_secret: String,
+    /// The callback URL registered at the IdP, e.g. https://o2.example.com/config/redirect
+    #[env_config(name = "ZO_OIDC_REDIRECT_URL", default = "")]
+    pub oidc_redirect_url: String,
+    #[env_config(name = "ZO_OIDC_SCOPES", default = "openid email profile")]
+    pub oidc_scopes: String,
+    #[env_config(name = "ZO_OIDC_DEFAULT_ORG", default = "default")]
+    pub oidc_default_org: String,
+    #[env_config(name = "ZO_OIDC_DEFAULT_ROLE", default = "admin")]
+    pub oidc_default_role: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

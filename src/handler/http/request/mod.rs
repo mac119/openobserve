@@ -46,6 +46,8 @@ pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod model_pricing;
+#[cfg(not(feature = "enterprise"))]
+pub mod oidc_login;
 pub mod organization;
 pub mod patterns;
 pub mod pipeline;

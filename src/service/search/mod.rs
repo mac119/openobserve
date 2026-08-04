@@ -42,7 +42,6 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::search::partition::aggregate::prepare_streaming_aggregate,
-    config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
@@ -1071,23 +1070,10 @@ pub fn generate_search_schema_diff(
 
 #[inline]
 pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        // for meta org usage and audit stream, we should always allow search
-        if _org_id == META_ORG_ID && _stream == Some(USAGE_STREAM) || _stream == Some("audit") {
-            return Ok(());
-        }
-        // this is installation level limit for all orgs combined
-        if !o2_enterprise::enterprise::license::search_allowed() {
-            Err(Error::Message(
-                "Search is temporarily disabled due to exceeding allotted ingestion limit. Please contact your administrator.".to_string(),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    #[cfg(not(feature = "enterprise"))]
+    // Ingestion-limit gating disabled: always allow search regardless of the
+    // enterprise license daily-ingestion quota. The upstream enterprise check
+    // (`o2_enterprise::enterprise::license::search_allowed()`) is intentionally
+    // bypassed here.
     Ok(())
 }
 

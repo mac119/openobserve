@@ -549,11 +549,17 @@ pub fn basic_routes() -> Router {
 /// Create config routes
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
+    use super::request::oidc_login;
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
+        // Open-source standard-OIDC SSO endpoints (unauthenticated: they are the
+        // login entry points). Kept path-compatible with the enterprise Dex flow
+        // so the existing frontend works unchanged.
+        .route("/dex_login", get(oidc_login::dex_login))
+        .route("/redirect", get(oidc_login::redirect))
 }
 
 #[cfg(feature = "enterprise")]

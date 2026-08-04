@@ -18,8 +18,7 @@ use axum::{
     response::{IntoResponse, Json, Response},
 };
 use o2_enterprise::enterprise::license::{
-    LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
-    ingestion_used, license_expired,
+    LICENSE_DB_KEY, License, check_license, get_license, ingestion_used, license_expired,
 };
 use serde::{Deserialize, Serialize};
 
@@ -136,7 +135,9 @@ pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
         license,
         installation_id: config::get_instance_id(),
         expired: license_expired().await,
-        ingestion_exceeded: ingestion_limit_exceeded_count(),
+        // Ingestion-limit gating disabled: always report 0 exceeded days so the
+        // UI never shows the "limit exceeded / features restricted" warning.
+        ingestion_exceeded: 0,
         ingestion_used: ingestion_used() * 100.0, // convert to percentage
     };
     MetaHttpResponse::json(res)

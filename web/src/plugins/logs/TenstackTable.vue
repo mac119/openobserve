@@ -687,7 +687,11 @@ const getRowBgColor = (rowData: any) => {
   const isDark = store.state.theme === 'dark';
   const statusInfo = extractStatusFromLog(rowData, isDark);
   const colorMap = isDark ? ROW_BG_COLORS_DARK : ROW_BG_COLORS;
-  return colorMap[statusInfo.level] || 'transparent';
+  const result = colorMap[statusInfo.level] || 'transparent';
+  if (result !== 'transparent') {
+    console.log('[ROW_BG]', statusInfo.level, result, rowData?.level);
+  }
+  return result;
 };
 
 watch(

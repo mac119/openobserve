@@ -196,6 +196,20 @@ export default defineConfig(({ mode }) => {
       //   "Content-Security-Policy":
       //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
       // },
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5080',
+          changeOrigin: true,
+        },
+        '/auth': {
+          target: 'http://localhost:5080',
+          changeOrigin: true,
+        },
+        '/config': {
+          target: 'http://localhost:5080',
+          changeOrigin: true,
+        },
+      },
     },
     base: "./",
     plugins: [

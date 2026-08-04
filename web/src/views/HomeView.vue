@@ -174,9 +174,11 @@ export default defineComponent({
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
-        tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
-      }
+      // O2 Assistant tab: shown unconditionally so the assistant UI is available
+      // in the open-source build too. Note the chat backend still requires the
+      // enterprise agent, so sending a message returns "only available in
+      // enterprise version" — the UI (welcome page / input) is what's exposed here.
+      tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       if (isEnterpriseOrCloud) {
         tabs.push({ id: "overview", label: t("home.tabOverview") });
       }

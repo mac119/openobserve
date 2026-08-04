@@ -1,0 +1,19 @@
+# Minimal image that wraps a pre-built openobserve binary for local testing.
+# The binary must be built BEFORE running `docker build` using:
+#   cargo build --release --bin openobserve
+FROM debian:trixie-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY target/release/openobserve /usr/local/bin/openobserve
+
+RUN /usr/local/bin/openobserve init-dir -p /data/
+
+EXPOSE 5080 5081
+
+ENV ZO_DATA_DIR=/data \
+    ZO_TELEMETRY=false
+
+CMD ["/usr/local/bin/openobserve"]

@@ -42,6 +42,7 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
+pub mod oidc;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
