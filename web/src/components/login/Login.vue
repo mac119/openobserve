@@ -240,6 +240,16 @@ export default defineComponent({
 
     const loginWithSSo = async () => {
       try {
+        // SAML (e.g. Taihu): /config/saml/login is itself a 302 redirect to the
+        // IdP, so navigate the browser straight there. Use the store's
+        // API_ENDPOINT (falls back to the page origin) — NOT config.API_ENDPOINT,
+        // which can be undefined here and produce a broken "/undefined/..." URL.
+        if (store.state.zoConfig.sso_type === "saml") {
+          const base = store.state.API_ENDPOINT || window.location.origin;
+          window.location.href = `${base}/config/saml/login?relay_state=/web/`;
+          return;
+        }
+        // OIDC (default): fetch the provider authorization URL, then redirect.
         authService.get_dex_login().then((res) => {
           if (res) {
             window.location.href = res;

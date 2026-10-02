@@ -760,6 +760,52 @@ pub struct Auth {
     pub oidc_default_org: String,
     #[env_config(name = "ZO_OIDC_DEFAULT_ROLE", default = "admin")]
     pub oidc_default_role: String,
+
+    // ---------------------------------------------------------------------
+    // Open-source SAML 2.0 SP SSO (e.g. Tencent Taihu IdP).
+    //
+    // Self-contained SAML 2.0 Service Provider (SP-initiated, HTTP-Redirect
+    // for AuthnRequest + HTTP-POST ACS). The IdP (Taihu) signs the assertion
+    // (`WantAssertionsSigned=true`); the SP verifies that signature against
+    // `saml_idp_cert`. First login auto-creates the user in `saml_default_org`
+    // with `saml_default_role`. Independent of the closed-source enterprise
+    // Dex/SAML crates.
+    // ---------------------------------------------------------------------
+    #[env_config(name = "ZO_SAML_ENABLED", default = false)]
+    pub saml_enabled: bool,
+    /// IdP SingleSignOnService URL (HTTP-Redirect binding), e.g.
+    /// https://tai.it.tencent.com/api/saml2/sso
+    #[env_config(name = "ZO_SAML_IDP_SSO_URL", default = "")]
+    pub saml_idp_sso_url: String,
+    /// IdP entityID, e.g. https://tai.it.tencent.com/api/saml2/metadata
+    #[env_config(name = "ZO_SAML_IDP_ENTITY_ID", default = "")]
+    pub saml_idp_entity_id: String,
+    /// IdP signing certificate (base64 DER, i.e. the `<X509Certificate>` body
+    /// from the IdP metadata, with or without PEM header/newlines).
+    #[env_config(name = "ZO_SAML_IDP_CERT", default = "")]
+    pub saml_idp_cert: String,
+    /// SP entityID advertised in SP metadata, e.g.
+    /// https://o2.example.com/config/saml/metadata
+    #[env_config(name = "ZO_SAML_SP_ENTITY_ID", default = "")]
+    pub saml_sp_entity_id: String,
+    /// SP AssertionConsumerService (ACS) URL the IdP POSTs back to, e.g.
+    /// https://o2.example.com/config/saml/acs
+    #[env_config(name = "ZO_SAML_SP_ACS_URL", default = "")]
+    pub saml_sp_acs_url: String,
+    /// SAML attribute name carrying the user's email / principal name.
+    /// Taihu returns OID format; defaults to eduPersonPrincipalName.
+    #[env_config(
+        name = "ZO_SAML_ATTR_EMAIL",
+        default = "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"
+    )]
+    pub saml_attr_email: String,
+    /// SAML attribute name carrying the user's display name (optional).
+    #[env_config(name = "ZO_SAML_ATTR_NAME", default = "urn:oid:2.5.4.3")]
+    pub saml_attr_name: String,
+    #[env_config(name = "ZO_SAML_DEFAULT_ORG", default = "default")]
+    pub saml_default_org: String,
+    #[env_config(name = "ZO_SAML_DEFAULT_ROLE", default = "admin")]
+    pub saml_default_role: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

@@ -197,6 +197,16 @@ utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment.workspace = true
 x509-parser = "0.18.0"
+# SAML 2.0 SP support (Taihu SSO): XML parsing + RSA signature verification.
+# All already present in the dependency tree (reused, no new source).
+# roxmltree: high-level structure parsing; quick-xml: original-token stream for
+# exclusive XML canonicalization (C14N must preserve the original prefixes).
+roxmltree = "0.21"
+quick-xml = "0.38"
+rsa = "0.9"
+# `oid` feature provides AssociatedOid, required by rsa Pkcs1v15Sign::new::<D>().
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true

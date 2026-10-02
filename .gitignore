@@ -77,3 +77,23 @@ tests/ui-testing/.env.old
 /.opencode/agents/*
 !/.opencode/agents/e2e_ci_council_of_agents/
 /tests/ux-audit/*
+
+# ---- customized/taihu-saml 分支：内部产物，不入库 ----
+# 敏感：含 root 密码/证书（.env* 已忽略，这里再显式保险）
+.o2_saml.env
+# 运行日志
+o2_saml.log
+*.log
+# 临时打包产物（源码包/部署包）
+openobserve-taihu-125.tar.gz
+openobserve-taihu-src-*.tar.gz
+disable_802.zip
+# macOS 解压残留
+__MACOSX/
+# SAML 参考实现（Python，体积大，单独保管）
+/disable_802/
+# 部署包内随行的大二进制（脚本/文档入库，二进制不入库）
+/deploy-125/openobserve-saml
+# 杂项：生成的图片、带后缀的备份文件
+/generated-images/
+*.bak.o2agent

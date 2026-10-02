@@ -55,6 +55,8 @@ pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
+#[cfg(not(feature = "enterprise"))]
+pub mod saml;
 pub mod schema;
 pub mod search;
 #[cfg(feature = "enterprise")]

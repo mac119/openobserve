@@ -549,7 +549,7 @@ pub fn basic_routes() -> Router {
 /// Create config routes
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
-    use super::request::oidc_login;
+    use super::request::{oidc_login, saml_login};
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
@@ -558,8 +558,17 @@ pub fn config_routes() -> Router {
         // Open-source standard-OIDC SSO endpoints (unauthenticated: they are the
         // login entry points). Kept path-compatible with the enterprise Dex flow
         // so the existing frontend works unchanged.
+        //
+        // NOTE: these are registered AFTER `route_layer(auth_middleware)` on
+        // purpose — in axum a route layer only applies to routes added before
+        // it, so entry-point endpoints must come after to stay unauthenticated.
         .route("/dex_login", get(oidc_login::dex_login))
         .route("/redirect", get(oidc_login::redirect))
+        // Open-source SAML 2.0 SP SSO endpoints (also unauthenticated entry
+        // points, hence after the auth route_layer above).
+        .route("/saml/metadata", get(saml_login::metadata))
+        .route("/saml/login", get(saml_login::login))
+        .route("/saml/acs", post(saml_login::acs))
 }
 
 #[cfg(feature = "enterprise")]

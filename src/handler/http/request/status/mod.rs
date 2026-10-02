@@ -157,6 +157,10 @@ struct ConfigResponse<'a> {
     extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
     sso_enabled: bool,
+    /// Which SSO flow the frontend should drive: "saml" (redirect to
+    /// /config/saml/login), "oidc" (fetch URL from /config/dex_login), or ""
+    /// (enterprise/none). Open-source only.
+    sso_type: String,
     native_login_enabled: bool,
     service_account_enabled: bool,
     rbac_enabled: bool,
@@ -338,8 +342,25 @@ pub async fn zo_config() -> impl IntoResponse {
     let block_features = block_feature_for_report_failure().await;
 
     // Open-source builds expose SSO via the standard-OIDC implementation
-    // (ZO_OIDC_ENABLED); enterprise builds use the Dex-based flow.
-    let sso_enabled = enterprise_value!(cfg.auth.oidc_enabled, dex_cfg.dex_enabled, block_features);
+    // (ZO_OIDC_ENABLED) or the SAML 2.0 SP (ZO_SAML_ENABLED, e.g. Taihu);
+    // enterprise builds use the Dex-based flow.
+    let sso_enabled = enterprise_value!(
+        cfg.auth.oidc_enabled || cfg.auth.saml_enabled,
+        dex_cfg.dex_enabled,
+        block_features
+    );
+    // Which SSO flow the open-source frontend should drive. Enterprise builds
+    // use the Dex flow and leave this empty.
+    let sso_type = enterprise_value!(
+        if cfg.auth.saml_enabled {
+            "saml".to_string()
+        } else if cfg.auth.oidc_enabled {
+            "oidc".to_string()
+        } else {
+            String::new()
+        },
+        String::new()
+    );
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
     let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
@@ -425,6 +446,7 @@ pub async fn zo_config() -> impl IntoResponse {
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
+        sso_type,
         native_login_enabled,
         service_account_enabled,
         rbac_enabled,

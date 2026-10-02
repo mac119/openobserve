@@ -67,6 +67,8 @@ pub mod score_configs;
 pub mod scorers;
 pub mod search;
 pub mod service_accounts;
+#[cfg(not(feature = "enterprise"))]
+pub mod saml_login;
 pub mod service_streams;
 pub mod short_url;
 pub mod sourcemaps;
