@@ -1,0 +1,381 @@
+
+TL;DR
+将腾讯内部 太湖 (Taihu) SSO 集成到 Network_AIOPS，员工可通过 IOA 准入账号直接登录。项目拆分为 3 个独立任务，共 16 个 commits，0 生产故障。密码登录作为 fallback 路径完整保留。
+
+Background
+集成前的状态
+层级
+
+集成前
+
+Frontend
+
+Login.jsx 将 infratest / test123 硬编码在 React 源码中
+
+Backend
+
+/api/* 无任何鉴权，任何能访问 8000 端口的人均可直接 curl 调用
+
+Protocol
+
+Backend HTTP，Frontend HTTPS（不匹配）
+
+Session
+
+仅前端 sessionStorage('authenticated', '1') 标记（装饰性，无实际校验）
+
+目标
+在登录页提供 Password 和 SAML 两条路径，二者最终收敛到同一个 HttpOnly cookie session。
+
+Why This Time Worked
+上一次尝试失败的 3 个根本原因（自我诊断）：
+
+Prompt 粒度不足 → AI 边写边改 → 代码混乱难以追踪
+
+Git 未保持干净 → 不清楚实际改动范围
+
+理解不到位就开始写代码
+
+本次的工程纪律：
+
+Documentation-first — 每个任务先完成 §1–§8 设计文档，每一个决策都有明确的 why
+
+One branch per task — 不混合不相关的改动
+
+One thing per commit — 平均每个 commit 改动约 10 行
+
+Incremental + reversible — master 始终保持可工作的 baseline
+
+The Three Tasks
+Task 1 — Move Password Login to Backend
+为什么先做：先建立 session infrastructure。SAML 只需要"再加一种签发 session 的方式"，不需要从头搭建。
+
+改动内容：
+
+新增 Backend/auth.py（约 46 行）：SESSIONS dict + POST /api/login + cookie 签名
+
+Frontend/Login.jsx：本地比对逻辑 → 改为 fetch('/api/login')
+
+Backend/main.py：+2 行接入 auth_router
+
+明确不在本任务范围内（推迟到独立任务）：不改密码值、不存 hash、不迁移 .env、不给 /api/* 加 middleware。
+
+设计文档：docs/MOVE_PASSWORD_TO_BACKEND.md（352 行）
+
+Task 2 — Enable HTTPS on Backend
+为什么先做：太湖 SP metadata 中 ACS URL 为 https://170.106.75.184:8000/saml/acs，但 backend 仅服务 HTTP，太湖回调时会 TLS 握手失败。
+
+改动内容（共约 8 行）：
+
+Backend/main.py：uvicorn.run(... ssl_keyfile=..., ssl_certfile=...)
+
+Frontend/vite.config.js：/api proxy target 由 http:// 改为 https://，加 secure: false
+
+沿用现有 Backend/cert.pem / key.pem（Subject = CN=170.106.75.184，SAN = IP，有效期至 2027-05-27）
+
+设计文档：docs/ENABLE_BACKEND_HTTPS.md（295 行）
+
+Task 3 — SAML Integration
+本次的核心任务。
+
+Backend
+文件
+
+行数
+
+用途
+
+Backend/saml.py
+
+~160
+
+3 个路由：/saml/metadata、/saml/login、/saml/acs
+
+Backend/saml_config/settings.json
+
+~30
+
+SP entityID、ACS URL、NameIDFormat
+
+Backend/saml_config/advanced_settings.json
+
+~20
+
+Security flags
+
+Backend/main.py
+
++2
+
+接入 saml_router
+
+Backend/pyproject.toml
+
++2
+
+声明 python3-saml、xmlsec 依赖
+
+使用库：python3-saml 1.16.0 + xmlsec（上次尝试留下的基础设施，本次直接复用）
+
+关键 SP 配置：
+
+WantAssertionsSigned: true — 要求太湖对 assertion 签名（核心安全项）
+
+AuthnRequestsSigned: false — SP 发出的请求不签名
+
+不声明 encryption KeyDescriptor — 太湖侧无法加密 assertion
+
+Frontend
+Login.jsx：新增"Sign in with Single Sign-On (SAML)"按钮（约 28 行）
+
+App.jsx：useEffect 检测 ?saml=success query marker（约 9 行）
+
+vite.config.js：新增 /saml proxy（+5 行）
+
+SP Metadata（已上传至太湖管理后台）
+
+
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+                  validUntil="2036-05-27T22:40:58.302Z"
+                  entityID="https://170.106.75.184:8000/saml/metadata">
+    <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true"
+                     protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+        <AssertionConsumerService
+            Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+            Location="https://170.106.75.184:8000/saml/acs"
+            index="0" isDefault="true"/>
+    </SPSSODescriptor>
+</EntityDescriptor>
+设计文档：docs/SAML_TAIHU_DESIGN.md（约 700 行，共 8 节）
+
+Architecture After Integration
+
+
+[User Browser]
+   ↓ HTTPS (5173)
+[Vite Dev Server :5173] ── HTTPS via @vitejs/plugin-basic-ssl
+   │
+   ├── /api/*  → proxy → https://localhost:8000  (internal)
+   ├── /saml/* → proxy → https://localhost:8000  (internal)
+   └── (other) → serve React SPA
+[FastAPI Backend :8000] ── HTTPS via uvicorn ssl_keyfile/ssl_certfile
+   │
+   ├── /api/login           (auth.py)    ← Password path
+   ├── /saml/metadata       (saml.py)
+   ├── /saml/login          (saml.py)    → 302 redirect to 太湖
+   ├── /saml/acs            (saml.py)    ← POST from 太湖
+   └── /api/*               (业务接口)    ← 暂无 middleware（待 T2）
+                                          ↑ POST SAMLResponse
+[太湖 IdP @ tai.it.tencent.com]
+   │
+   ├── IOA device attestation（已入网设备静默通过）
+   └── SAML 2.0 SSO endpoint
+Two Login Paths, One Session
+两条路径最终收敛到同一个 HttpOnly cookie：
+
+
+
+Path A（Password）:
+   Login.jsx → POST /api/login → auth.py 校验 → 签发 cookie，SESSIONS[id] = username
+Path B（SAML）:
+   Login.jsx → /saml/login → 太湖 SSO → POST /saml/acs → saml.py 校验
+       → 签发 cookie，SESSIONS[id] = email
+Cookie 属性：HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800（有效期 8 小时）
+
+Real SAML Attributes（2026-05-30 真实登录确认）
+太湖返回的属性使用 OID format，而非 friendly name：
+
+OID
+
+含义
+
+示例值
+
+urn:oid:1.3.6.1.4.1.5923.1.1.1.6
+
+eduPersonPrincipalName（邮箱）← 用作 user_id
+
+yifanwei@global.tencent.com
+
+urn:oid:0.9.2342.19200300.100.1.1
+
+uid（fallback）
+
+yifanwei
+
+urn:oid:2.5.4.3 / 2.5.4.4 / 2.5.4.42
+
+cn / sn / givenName
+
+YIFAN WEI
+
+urn:oid:1.3.6.1.4.1.5923.1.1.1.1
+
+eduPersonAffiliation（groups）
+
+manage_group:..., company:tencent_global
+
+NameID
+
+声明为 transient，实测为固定 uid
+
+yifanwei
+
+⚠️ NameID 名义上是 transient（不稳定），不应作为持久 user_id。应使用 attributes 中的 eduPersonPrincipalName（邮箱）。
+
+Key Design Decisions
+决策项
+
+选择
+
+原因
+
+SAML 库
+
+python3-saml
+
+已安装、生态成熟、xmlsec1 系统依赖完整
+
+SP cert/key
+
+复用现有 HTTPS 证书
+
+简化起步；未来可按需分离
+
+AuthnRequestsSigned
+
+false
+
+太湖不要求 SP 对请求签名
+
+WantAssertionsSigned
+
+true
+
+安全关键 — 防止 assertion 伪造
+
+Encrypted assertions
+
+关闭
+
+SP metadata 不声明 encryption key，太湖无法加密
+
+User identity
+
+email（eduPersonPrincipalName）
+
+NameID 为 transient，名义上不稳定
+
+SLO（单点登出）
+
+跳过
+
+作为独立未来任务
+
+/api/* middleware
+
+跳过
+
+不在本次范围内，已记录为 TODO T2
+
+登录页 UX
+
+提供选择器（Password + SAML）
+
+用户自主选择，不强制跳转
+
+What's NOT Done（后续独立任务）
+TODO
+
+描述
+
+优先级
+
+T2
+
+/api/* 鉴权 middleware（校验有效 cookie）
+
+中 — 真正的安全提升
+
+T3
+
+GET /api/me endpoint（前端刷新后恢复 session）
+
+中
+
+T4
+
+POST /api/logout
+
+低
+
+—
+
+Single Logout（SLO）— 太湖已支持，仅需实现 SP 侧
+
+低
+
+—
+
+用户授权 / 角色系统（目前所有认证用户权限相同）
+
+低
+
+—
+
+自签名证书替换为 CA 签发证书
+
+低
+
+Operations
+当前服务进程
+
+
+# Backend
+./.venv/bin/python3 main.py     # https://0.0.0.0:8000
+# Frontend
+npm run dev (Vite 7.3.1)        # https://0.0.0.0:5173
+重启步骤
+
+
+# Backend
+kill $(cat Backend/backend.pid)
+cd Backend && nohup ./.venv/bin/python3 main.py > backend.log 2>&1 &
+echo $! > backend.pid
+# Frontend（vite.config.js 改动不会热重载，需完整重启）
+kill $(cat Frontend/frontend.pid)
+cd Frontend && nohup npm run dev > frontend.log 2>&1 &
+echo $! > frontend.pid
+Session 存储
+进程内 SESSIONS: dict[str, str]（session_id → user_id email）。Backend 重启后 session 清空，目前频率可接受（因为 /api/* 暂无 middleware 强制校验 cookie）。若 T2 实施后出现频繁掉线，再考虑迁移至 Redis 或改用 signed cookie。
+
+审计日志
+backend.log 中每次登录记录一行 INFO:saml:SAML login: user=<email>。完整 attributes 仅在 DEBUG level 输出，不进入 INFO 日志。
+
+Lessons Learned
+Documentation-first 确实有效 — 设计文档共约 1300 行，写文档花的时间远少于它节省的返工时间。本次 16 个 commits 每个独立、可读、可 revert，上次的代码混乱没有重演。
+
+拆分增量交付 — 3 个独立任务，每个改动在 200 行以内，每个单独合入 master。任一环节出问题不影响其他部分。
+
+复用已有基础设施 — python3-saml + xmlsec 是上次失败留下的"沉没成本"，本次让它发挥价值。HTTPS 证书同样复用现有资产。
+
+实测，不要假设 — 原本推测属性名为 email / mail / emailAddress，实际是 OID format。通过 dev-only logger.info 捕获一次真实流量，确认后回填代码并降级至 logger.debug。
+
+明确 user_id 的来源 — 基于 token 的系统必须有稳定的用户标识来源。NameID transient 是个常见陷阱，必须使用 attributes 中的 email 或 uid。
+
+References
+设计文档（docs/ 目录）：
+
+MOVE_PASSWORD_TO_BACKEND.md — Task 1
+
+ENABLE_BACKEND_HTTPS.md — Task 2
+
+SAML_TAIHU_DESIGN.md — Task 3
+
+IdP metadata：docs/idp-metadata/taihu-metadata.xml
+
+Library：python3-saml on GitHub
+
+太湖 SAML 接入文档：tai.it.tencent.com
+
+SAML 2.0 规范：OASIS SAML Core 2.0
